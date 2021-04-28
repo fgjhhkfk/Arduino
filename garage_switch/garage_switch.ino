@@ -12,17 +12,22 @@ const int LED = 2;
 #define DHTTYPE DHT22     // DHT 22 (AM2302)
 
 DHT dht(DHTPIN, DHTTYPE);
+float t_bak = 999;
+float t = 999;
 
 String readDHTTemperature() {
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   // Read temperature as Celsius (the default)
+  float t_bak = t;
   float t = dht.readTemperature();
   // Read temperature as Fahrenheit (isFahrenheit = true)
   //float t = dht.readTemperature(true);
   // Check if any reads failed and exit early (to try again).
+  Serial.println("-----------------------------------------------------------");
   if (isnan(t)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return "--";
+    Serial.println("Failed to read from DHT sensor!\nReturning old value for Temperature: " + String(t_bak));
+    String asw = String(t_bak) + "!";
+    return asw;
   }
   else {
     Serial.println(t);
@@ -30,12 +35,17 @@ String readDHTTemperature() {
   }
 }
 
+float h_bak = 999;
+float h = 999;
+
 String readDHTHumidity() {
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  h_bak = h;
   float h = dht.readHumidity();
   if (isnan(h)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return "--";
+    Serial.println("Failed to read from DHT sensor!\nReturning old value for Humidity: " + String(h_bak));
+    String asw = String(h_bak) + "!";
+    return asw;
   }
   else {
     Serial.println(h);
@@ -90,33 +100,45 @@ const char index_html[] PROGMEM = R"rawliteral(
     </style>
   </head>
   <body>
-    <h1>Klick to open!</h1>
+    <h1>Klick to open or close!</h1>
     <p>
-      <button class="button" onmousedown="toggleCheckbox('on');" ontouchstart="toggleCheckbox('on');" onmouseup="toggleCheckbox('off');" ontouchend="toggleCheckbox('off');">Klick</button>
-      <script>
-      function toggleCheckbox(x) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "/" + x, true);
-        xhr.send();
-      }
-      </script>
+      <a class="button" href="/switch" title="Home">Klick</a>
     </p>
     <p>
       <i class="fas fa-thermometer-half" style="color:#059e8a;"></i>
       <span class="dht-labels">Temperature</span>
-      <span id="temperature">%TEMPERATURE%</span>
+      <span id="temperature">__.__</span>
       <sup class="units">&deg;C</sup>
     </p>
     <p>
       <i class="fas fa-tint" style="color:#00add6;"></i>
       <span class="dht-labels">Humidity</span>
-      <span id="humidity">%HUMIDITY%</span>
+      <span id="humidity">__.__</span>
       <sup class="units">&percnt;</sup>
     </p>
 
 </script>
 </body>
 <script>
+    /* Skript gleich beim Laden ausfuehren, dann alle x Sekunden! */
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+        document.getElementById("temperature").innerHTML = this.responseText;
+        }
+    };
+    xhttp.open("GET", "/temperature", true);
+    xhttp.send();
+
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+        document.getElementById("humidity").innerHTML = this.responseText;
+        }
+    };
+    xhttp.open("GET", "/humidity", true);
+    xhttp.send();
+
     setInterval(function ( ) {
     var xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
@@ -126,7 +148,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     };
     xhttp.open("GET", "/temperature", true);
     xhttp.send();
-    }, 5000 ) ;
+    }, 30000 ) ;
 
     setInterval(function ( ) {
     var xhttp = new XMLHttpRequest();
@@ -137,7 +159,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     };
     xhttp.open("GET", "/humidity", true);
     xhttp.send();
-    }, 5000 ) ;
+    }, 30000 ) ;
 
 </script>
 </html>)rawliteral";
@@ -156,7 +178,7 @@ void success()
     delay(500);
     digitalWrite(LED, LOW);
     delay(500);
-  } 
+  }
 }
 
 void setup() {
@@ -196,15 +218,11 @@ void setup() {
   });
 
   // Receive an HTTP GET request
-  server.on("/on", HTTP_GET, [] (AsyncWebServerRequest * request) {
+  server.on("/switch", HTTP_GET, [] (AsyncWebServerRequest * request) {
     digitalWrite(output, HIGH);
-    request->send(200, "text/plain", "ok");
-  });
-
-  // Receive an HTTP GET request
-  server.on("/off", HTTP_GET, [] (AsyncWebServerRequest * request) {
+    delay(500);
     digitalWrite(output, LOW);
-    request->send(200, "text/plain", "ok");
+    request->send(200, "text/html", index_html);
   });
 
   server.on("/icon", HTTP_GET, [](AsyncWebServerRequest * request) {
