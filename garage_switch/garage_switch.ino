@@ -11,6 +11,10 @@ const int LED = 2;
 #define DHTPIN 25     // Digital pin connected to the DHT sensor
 #define DHTTYPE DHT22     // DHT 22 (AM2302)
 
+// Variables for reconnecting WIFI
+unsigned long previousMillis = 0;
+unsigned long interval = 30000;
+
 DHT dht(DHTPIN, DHTTYPE);
 float t_bak = 999;
 float t = 999;
@@ -241,5 +245,13 @@ void setup() {
 }
 
 void loop() {
-
+  unsigned long currentMillis = millis();
+  // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
+  if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >=interval)) {
+    Serial.print(millis());
+    Serial.println("Reconnecting to WiFi...");
+    WiFi.disconnect();
+    WiFi.reconnect();
+    previousMillis = currentMillis;
+  } 
 }
